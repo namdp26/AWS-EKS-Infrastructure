@@ -7,7 +7,7 @@ module "eks_cluster" {
 
   cluster_name    = "dbiz-cluster"
   cluster_version = "1.24"
-
+  create_iam_role = true
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
   enable_irsa                     = true
