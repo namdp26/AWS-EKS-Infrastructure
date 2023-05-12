@@ -1,16 +1,15 @@
 # Create EKS cluster
 locals {
-  name            = "production-cluster"
+  name            = "eks-production-cluster"
   cluster_version = "1.24"
   region          = "eu-west-1"
 
   vpc_cidr = "10.0.0.0/16"
-  azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+  azs      = ["us-east-1a", "us-east-1b"]
 
   tags = {
-    Example    = local.name
-    GithubRepo = "terraform-aws-eks"
-    GithubOrg  = "terraform-aws-modules"
+    Name        = local.name
+    Environment = "Production"
   }
   ## AMI ID for Ubuntu 22.04 LTS amd64
   eks_ami_id              = "ami-007855ac798b5175e"
@@ -21,13 +20,12 @@ locals {
   node_group_desired_size = 1
 }
 
-
-
 module "key_pair" {
   source = "../../modules/keypair"
 
   key_name   = [for key_pair in var.key_pairs : key_pair.key_name]
   public_key = [for key_pair in var.key_pairs : key_pair.public_key]
+  tag        = local.tag
 }
 
 module "eks_cluster" {
@@ -69,19 +67,67 @@ module "eks_cluster" {
 
   self_managed_node_groups = {
     worker = {
-      name          = local.node_group_name
+      name = local.node_group_name
 
-      subnet_ids    = data.terraform_remote_state.aws_vpc.outputs.private_subnets
-      key_name      = module.key_pair.key_pair_name
+      subnet_ids = data.terraform_remote_state.aws_vpc.outputs.private_subnets
 
-      min_size      = local.node_group_min_size
-      max_size      = local.node_group_max_size
-      desired_size  = local.node_group_desired_size
+      min_size     = local.node_group_min_size
+      max_size     = local.node_group_max_size
+      desired_size = local.node_group_desired_size
 
       ami_id        = local.eks_ami_id
       instance_type = local.node_instance_type
-      launch_template_name            = "self-managed-ex"
 
+      launch_template_name            = "eks_worker_self_managed"
+      launch_template_use_name_prefix = true
+      launch_template_description     = "Self managed node group example launch template"
+
+      ebs_optimized     = true
+      enable_monitoring = true
+
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size = 80
+            volume_type = "gp3"
+            iops        = 3000
+            throughput  = 150
+            encrypted   = true
+            # kms_key_id            = module.ebs_kms_key.key_arn
+            delete_on_termination = true
+          }
+        }
+      }
+
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 2
+        instance_metadata_tags      = "disabled"
+      }
+
+      create_iam_role          = true
+      iam_role_name            = "self-managed-node-group"
+      iam_role_use_name_prefix = false
+      iam_role_description     = "Self managed node group"
+      iam_role_tags = {
+        Purpose = "Protector of the kubelet"
+      }
+      iam_role_additional_policies = {
+        AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        additional                         = aws_iam_policy.eks_node_group.arn
+      }
+
+      timeouts = {
+        create = "80m"
+        update = "80m"
+        delete = "80m"
+      }
+
+      tags = {
+        Name = "Self managed node group"
+      }
       bootstrap_extra_args = <<-EOT
         # The admin host container provides SSH access and runs with "superpowers".
         # It is disabled by default, but can be disabled explicitly.
@@ -103,67 +149,30 @@ module "eks_cluster" {
       EOT
     }
   }
+  tags = local.tags
 }
 
-#   eks_managed_node_groups = {
-#     blue = {
-#       scaling_config = [
-#         {
-#           min_size = 1
-#           max_size = 5
-#           metric   = "cpu"
-#           value    = "70"
-#         },
-#         {
-#           min_size = 1
-#           max_size = 5
-#           metric   = "memory"
-#           value    = "80"
-#         },
-#         {
-#           min_size = 1
-#           max_size = 5
-#           metric   = "custom-metric"
-#           value    = "100"
-#           namespace = "custom-metrics-namespace"
-#           metric_name = "custom-metric-name"
-#         }
-#       ]
-#       instance_types = ["m6i.xlarge"]
-#     }
-#   }
+resource "aws_iam_policy" "eks_node_group" {
+  name        = "${local.name}-eks_node_group"
+  description = "Example usage of node eks_node_group policy"
 
-#   tags = {
-#     Terraform   = "true"
-#     Environment = "production"
-#   }
+  policy = jsonencode({
+    Version = "2023-05-13"
+    Statement = [
+      {
+        Action = [
+          "ec2:Describe*",
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
 
-resource "aws_security_group" "eks_node_group" {
-  name_prefix = "eks-node-group-sg-"
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  vpc_id = module.vpc.vpc_id
+  tags = local.tags
 }
+
+
 
 
 
