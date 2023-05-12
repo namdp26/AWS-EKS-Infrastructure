@@ -1,6 +1,6 @@
 module "vpc" {
-  source                 = "terraform-aws-modules/vpc/aws"
-  name                   = "dbiz-vpc"
+  source                 = "../../modules/vpc"
+  name                   = "dbiz-prod-vpc"
   cidr                   = "10.0.0.0/16"
   azs                    = ["us-east-1a", "us-east-1b"]
   private_subnets        = ["10.0.10.0/24", "10.0.20.0/24"]
@@ -21,3 +21,5 @@ resource "aws_eip" "nat" {
   count = 1
   vpc   = true
 }
+
+
