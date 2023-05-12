@@ -7,4 +7,8 @@ module "s3_bucket" {
     Terraform   = "true"
     Environment = "Production"
   }
+  versioning = {
+    status     = true
+    mfa_delete = false
+  }
 }
