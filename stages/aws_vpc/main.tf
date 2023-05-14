@@ -7,19 +7,22 @@ locals {
 }
 
 module "vpc" {
-  source                 = "../../modules/vpc"
-  name                   = local.name
-  cidr                   = local.vpc_cidr
-  azs                    = local.vpc_azs
-  private_subnets        = local.prod_vpc_private_subnets
-  public_subnets         = local.prod_vpc_public_subnets
-  enable_nat_gateway     = true
-  single_nat_gateway     = true
-  reuse_nat_ips          = true
-  one_nat_gateway_per_az = false
-  external_nat_ip_ids    = aws_eip.nat.*.id
-  enable_dns_hostnames   = true
-  enable_dns_support     = true
+  source                               = "../../modules/vpc"
+  name                                 = local.name
+  cidr                                 = local.vpc_cidr
+  azs                                  = local.vpc_azs
+  private_subnets                      = local.prod_vpc_private_subnets
+  public_subnets                       = local.prod_vpc_public_subnets
+  enable_nat_gateway                   = true
+  single_nat_gateway                   = true
+  reuse_nat_ips                        = true
+  one_nat_gateway_per_az               = false
+  external_nat_ip_ids                  = aws_eip.nat.*.id
+  enable_dns_hostnames                 = true
+  enable_dns_support                   = true
+  enable_flow_log                      = true
+  create_flow_log_cloudwatch_iam_role  = true
+  create_flow_log_cloudwatch_log_group = true
   tags = {
     Environment = "production"
   }

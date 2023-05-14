@@ -25,7 +25,7 @@ module "key_pair" {
 
   key_name   = [for key_pair in var.key_pairs : key_pair.key_name]
   public_key = [for key_pair in var.key_pairs : key_pair.public_key]
-  tag        = local.tag
+  tag        = local.tags
 }
 
 module "eks_cluster" {
@@ -119,7 +119,9 @@ module "eks_cluster" {
       ami_id        = local.eks_ami_id
       instance_type = local.node_instance_type
 
-      launch_template_name            = "eks_worker_self_managed"
+      create_autoscaling_group        = true
+      autoscaling_group_tags          = local.tags
+      launch_template_name            = "asg-${local.name}"
       launch_template_use_name_prefix = true
       launch_template_description     = "Self managed node group example launch template"
 
@@ -151,8 +153,8 @@ module "eks_cluster" {
       }
 
       create_iam_role          = true
-      iam_role_name            = "self-managed-node-group"
-      iam_role_use_name_prefix = false
+      iam_role_name            = local.name
+      iam_role_use_name_prefix = true
       iam_role_description     = "Self managed node group"
       iam_role_tags = {
         Purpose = "Protector of the kubelet"
