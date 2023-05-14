@@ -16,8 +16,8 @@ locals {
   node_group_name         = "worker-self-managed-node-group"
   node_instance_type      = "m6i.xlarge"
   node_group_min_size     = 1
-  node_group_max_size     = 1
-  node_group_desired_size = 1
+  node_group_max_size     = 2
+  node_group_desired_size = 0
 }
 
 module "key_pair" {
@@ -65,6 +65,47 @@ module "eks_cluster" {
     }
   }
 
+  # Extend cluster security group rules
+  cluster_security_group_additional_rules = {
+    ingress_nodes_ephemeral_ports_tcp = {
+      description                = "Nodes on ephemeral ports"
+      protocol                   = "tcp"
+      from_port                  = 1025
+      to_port                    = 65535
+      type                       = "ingress"
+      source_node_security_group = true
+    }
+
+    ingress_source_security_group_id = {
+      description              = "Ingress from another computed security group"
+      protocol                 = "tcp"
+      from_port                = 22
+      to_port                  = 22
+      type                     = "ingress"
+      source_security_group_id = aws_security_group.additional.id
+    }
+  }
+  # Extend node-to-node security group rules
+  node_security_group_additional_rules = {
+    ingress_self_all = {
+      description = "Node to node all ports/protocols"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
+      type        = "ingress"
+      self        = true
+    }
+    # Test: https://github.com/terraform-aws-modules/terraform-aws-eks/pull/2319
+    ingress_source_security_group_id = {
+      description              = "Ingress from another computed security group"
+      protocol                 = "tcp"
+      from_port                = 22
+      to_port                  = 22
+      type                     = "ingress"
+      source_security_group_id = aws_security_group.additional.id
+    }
+  }
+
   self_managed_node_groups = {
     worker = {
       name = local.node_group_name
@@ -99,6 +140,8 @@ module "eks_cluster" {
           }
         }
       }
+
+      vpc_security_group_ids = aws_security_group.allow_ssh.id
 
       metadata_options = {
         http_endpoint               = "enabled"
@@ -152,12 +195,24 @@ module "eks_cluster" {
   tags = local.tags
 }
 
+resource "aws_security_group" "eks-security-group" {
+  name_prefix = "allow_ssh_protocol"
+  description = "Allow SSH inbound traffic"
+  vpc_id      = data.terraform_remote_state.aws_vpc.outputs.vpc_id
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_iam_policy" "eks_node_group" {
   name        = "${local.name}-eks_node_group"
   description = "Example usage of node eks_node_group policy"
 
   policy = jsonencode({
-    Version = "2023-05-13"
+    Version = "2012-10-17"
     Statement = [
       {
         Action = [

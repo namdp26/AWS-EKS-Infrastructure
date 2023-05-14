@@ -52,3 +52,8 @@ output "aws_eip" {
   description = "List of AWS Elastic IP"
   value       = aws_eip.nat.public_ip
 }
+
+output "aws_eip_id" {
+  description = "List of AWS Elastic IP ID"
+  value       = aws_eip.nat.id
+}

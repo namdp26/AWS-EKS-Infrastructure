@@ -8,11 +8,6 @@ locals {
   }
 }
 
-resource "aws_eip" "nat" {
-  count = 1
-  vpc   = true
-}
-
 # Create a Security Group for the ALB
 resource "aws_security_group" "eks-alb" {
   name_prefix = "allow-alb-traffic"
@@ -70,14 +65,14 @@ resource "aws_lb_target_group" "default" {
   port        = 90
   protocol    = "HTTP"
   vpc_id      = data.terraform_remote_state.aws_vpc.outputs.vpc_id
-  target_type       = "ip"
+  target_type = "ip"
   health_check {
-    protocol     = "HTTP"
+    protocol = "HTTP"
     # port         = "traffic-port"
-    path         = "/"
-    interval     = 30
-    timeout      = 5
-    healthy_threshold = 2
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
     unhealthy_threshold = 2
   }
 
@@ -106,13 +101,13 @@ resource "aws_lb_listener_rule" "alb_listener_rule" {
   }
 }
 
-resource "aws_lb_listener_certificate" "alb_https_listener_certificate" {
-  listener_arn    = aws_lb_listener.alb_listener.arn
-  certificate_arn = aws_acm_certificate.default.arn
-}
+# resource "aws_lb_listener_certificate" "alb_https_listener_certificate" {
+#   listener_arn    = aws_lb_listener.alb_listener.arn
+#   certificate_arn = aws_acm_certificate.default.arn
+# }
 
 # Map the EIP to the ALB
 resource "aws_eip_association" "eip" {
   instance_id   = aws_lb.alb.arn
-  allocation_id = aws_eip.nat.id
+  allocation_id = data.terraform_remote_state.vpc.aws_eip_id
 }
