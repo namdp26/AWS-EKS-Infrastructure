@@ -1,8 +1,8 @@
-data "terraform_remote_state" "loadbalancer" {
+data "terraform_remote_state" "vpc" {
   backend = "s3"
   config = {
     bucket = "dbiz-tf-state-bucket"
-    key    = "lb.tfstate"
+    key    = "vpc.tfstate"
     region = var.region
   }
 }
